@@ -57,7 +57,6 @@ then update the media files to be on a mounted HDD drive ([LVM](https://wiki.alp
 - [ ] Setup subtitles service for movies/tv/anime
 - [ ] Refine container user:group permissions
 - [ ] Setup script to run (folders, permissions, boilerplate config with completed integrations etc.)
-- [ ] Create TOC for README
 - [ ] Setup simple health checks and dependency logic for all services
 
 ## Installation
