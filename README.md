@@ -32,15 +32,19 @@ A docker-compose setup of a media server. Covers viewing, installation, searchin
 Installation shows a complete example setup on alpine linux, but other OS' should work fine as the core applications are run from docker-compose.
 
 Setup includes by default:
-- [Jellyfin](https://jellyfin.org/docs/): Media manager/server, alternative to Plex. Allows viewing media files like videos, images, music etc.
-- [Prowlarr](https://wiki.servarr.com/prowlarr): Index manager/proxy for torrents. Lets other applications (e.g. sonarr and Radarr) search/query for media files from various torrent sites at once.
-- [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr): Proxy server to bypass cloudflare protections. To be used with [Prowlarr for specific sources](https://wiki.servarr.com/en/prowlarr/faq#can-i-use-flaresolverr-indexers).
-- [qBittorrent](https://www.qbittorrent.org/): Torrent manager/installer. To be used to actually download the torrents found by sonarr or radarr, queried to Prowlarr.
-- [Sonarr](https://wiki.servarr.com/sonarr): TV/Series manager. Search and install movies through qbittorrent (install) and prowlarr (query torrents) through integrations.
-- [Radarr](https://wiki.servarr.com/radarr): Movie manager. Search and install movies through qbittorrent (install) and prowlarr (query torrents) through integrations.
-- [Lidarr](https://wiki.servarr.com/lidarr/quick-start-guide): Music manager. Search and install music through qbittorrent (install) and prowlarr (query torrents) through integrations.
-- [Gluetun](https://github.com/qdm12/gluetun?tab=readme-ov-file#setup): Run VPN in a container, to be used by other containers as a network interface. Just saves a lot of hassle.
-- [Docker](https://wiki.alpinelinux.org/wiki/Docker): To manage everything in containers. Allows for quick and contained deployment.
+
+| Service                                                              | Description                                                                                                                                                               |
+|----------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Jellyfin](https://jellyfin.org/docs/)                               | Media manager/server, alternative to Plex. Allows viewing media files like videos, images, music etc.                                                                     |
+| [Prowlarr](https://wiki.servarr.com/prowlarr)                        | Index manager/proxy for torrents. Lets other applications (e.g. Sonarr and Radarr) search/query for media files from various torrent sites at once.                       |
+| [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr)         | Proxy server to bypass Cloudflare protections. To be used with [Prowlarr for specific sources](https://wiki.servarr.com/en/prowlarr/faq#can-i-use-flaresolverr-indexers). |
+| [qBittorrent](https://www.qbittorrent.org/)                          | Torrent manager/downloader. Used to download the torrents found by Sonarr or Radarr, queried through Prowlarr.                                                            |
+| [Sonarr](https://wiki.servarr.com/sonarr)                            | TV/series manager. Searches and installs TV episodes through qBittorrent (install) and Prowlarr (torrent queries).                                                        |
+| [Radarr](https://wiki.servarr.com/radarr)                            | Movie manager. Searches and installs movies through qBittorrent (install) and Prowlarr (torrent queries).                                                                 |
+| [Lidarr](https://wiki.servarr.com/lidarr/quick-start-guide)          | Music manager. Searches and installs music through qBittorrent (install) and Prowlarr (torrent queries).                                                                  |
+| [Gluetun](https://github.com/qdm12/gluetun?tab=readme-ov-file#setup) | VPN-in-a-container used as a network interface for other containers. Simplifies configuration.                                                                            |
+| [Docker](https://wiki.alpinelinux.org/wiki/Docker)                   | Container engine used to manage and deploy all services.                                                                                                                  |
+
 
 Adding another service to the list is easy. Just create another container for it. If you search for e.g. "kapowarr docker container" you should find [steps to add it to the docker-compose](https://casvt.github.io/Kapowarr/installation/docker/#__tabbed_4_2).
 For inspiration and ideas, see [Awesome arr](https://github.com/Ravencentric/awesome-arr?tab=readme-ov-file) which lists many arr applications.
@@ -140,6 +144,7 @@ You can access the HTTP version of the websites at (IPs/domains will differ from
 | Sonarr      | `http://100.122.39.113:8989`       |
 | Radarr      | `http://100.122.39.113:7878`       |
 | Lidarr      | `http://100.122.39.113:8686`       |
+
 Make sure you can access the web UI of each through your browser. Verify the tailscale ACL or any firewalls aren't blocking you, and check docker logs if issues arise.
 Now, we will update the base URL in the configuration of each service, to afterward setup HTTPS using [tailscale serve](https://tailscale.com/kb/1242/tailscale-serve).
 
