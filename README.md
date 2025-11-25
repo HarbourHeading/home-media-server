@@ -1,370 +1,254 @@
-# automated-jellyfin-guide
-
-A complete guide to setting up a home media server with automated requests/downloads
-
-# The Stack
-
-Here's the stack we'll be using. There will be a section describing the installation and configuration for each one of these
-
-**Docker** lets us run and isolate each of our services into a container. Everything for each of these services will live in the container except the configuration files which will live on our host.
-
-**Jellyfin** is an open source media server. It is an alternative to the more popular Plex media server. Previous iterations of this guide had instructions for Plex, but I have since gone all in on Jellyfin for a number of reasons.
-
-1) The server runs entirely on your local network whereas Plex servers use a proprietary authentication system.
-2) In recent years Plex has increasingly incorporated annoying features such as their free built in streaming service. Some may find this useful, but personally I find it to be too much clutter.
-3) Plex has moved existing features behind [paywalls](https://www.pcworld.com/article/2642674/plexs-lifetime-subscription-plan-is-getting-a-massive-price-hike.html).
-4) Jellyfin is open source, and all of it's features are completely free. No need for a Plex pass.
-
-That said, Jellyfin lags behind Plex in a few features and especially in client support. If you decide to stick with Plex, most of this guide will still work, you'll just need to swap out Jellyfin, switch out Jellyseer and Jfa-Go for Plex equivilents, and update the connections to Sonnar/Radarr/etc.
-
-**qBittorrent** is a torrent client. Transmission and Deluge are also popular choices but I chose qBittorrent because you can easily configure it to only operate over the VPN connection.
-
-**Gluetun** is a VPN running in docker. This will allow you to connect the qBittorrent container to your VPN without having to put your entire system behind it
-
-**Prowlarr** is a tool that Sonarr and Radarr use to search indexers and trackers for torrents
-
-**FlareSolverr** can optionally be installed alongside Prowlarr to bypass cloudflare protections. Required for certain indexors (ex. 1337).
-
-**Sonarr** is a tool for automating and managing your TV library. It automates the process of searching for torrents, downloading them then "moving" them to your library. It also checks RSS feeds to automatically download new shows as soon as they're uploaded! 
-
-**Radarr** is a fork of Sonarr that does all the same stuff but for Movies
-
-## Optional
-
-The following are additional services I recommend. Since the scope of this guide is mainly about just getting started for new users, I'm not going to go much into how to set them up. However the setup process will generally be very similar.
-
-**[jfa-go](https://github.com/hrfee/jfa-go)** is a user manager for Jellyfin that allows your users to sign up via an invite code and reset their passwords
-
-**Update 10/25/25** [Wizzarr](https://github.com/Wizarrrr/wizarr) seem like a more polished implementation and it supports multiple services besides Jellyfin.
-
-**[Jellyseerr](https://github.com/Fallenbagel/jellyseerr)** is an application for managing requests for your media library. It is a fork of Overseerr built to bring support for Jellyfin servers!
-
-**Update 10/25/25** Jellyseerr is in the process of merging with Overseerr. Unclear how this will effect current Jellyseerr users, but you can track the progress [here](https://github.com/seerr-team/seerr).
-
-**[Homepage](https://github.com/gethomepage/homepage)** is a dashboard for keeping track all of these web services
-
-**[Bazarr](https://wiki.bazarr.media/Getting-Started/Setup-Guide/)** is a tool for Sonarr and Radarr to download subtitles for your content
-
-**[Unmanic](https://docs.unmanic.app/)** is a great tool for optimising media files. For example, you can use it to remove unneccessary subtitles/audio tracks and transcode media to your desired format.
-
-**[nginx-proxy-manager](https://nginxproxymanager.com/guide/#quick-setup)** is a simple reverse proxy service for making Jellyfin accessible outside of your local network
-
-**Update 10/25/25** I've personally switched from nginx-proxy-manager to [Caddy](https://caddyserver.com/). But this is strictly a personal preference.
-
-# Installing Docker
-
-Installation steps will vary based on distro. I recommend following the instructions in the [Docker documentation](https://docs.docker.com/engine/install/).
-
-You will also need to install Docker Compose. Again I recommend following the official [Docker documentation](https://docs.docker.com/compose/install).
-
-I like to keep my configs in one easy place, so let’s create a folder to hold our docker container configs and create our docker-compose.yml file
-
-```
-mkdir ~/docker
-touch ~/docker/docker-compose.yml
-```
-
-And add this to the top of your docker-compose file. We will be filling in the services in the coming steps. If you are confused on how to add the services or how your file should look, [here is a good resource on docker-compose]([https://docs.docker.com/compose/compose-file/compose-file-v2/](https://docs.docker.com/reference/compose-file/)).
-
-```
-services:
-```
-
-# Jellyfin Docker Config
-
-Add the following lines to ~/docker/docker-compose.yml under "services:" Pay close attention to the indentations.
-
-```
-  jellyfin:
-    image: ghcr.io/linuxserver/jellyfin
-    container_name: jellyfin
-    environment:
-      - PUID=1000
-      - PGID=1000
-    volumes:
-      - ./jellyfin:/config
-      - /path/to/media:/media
-    ports:
-      - 8096:8096
-    restart: unless-stopped
-```
-
-This will start your Jellyfin server on port 8096, and add the volumes ~/docker/jellyfin and /path/to/media onto the container.
-
-Replace /path/to/media to your media directory. Your media directory should contain subdirectories labelled "tv" and "movies".
-
-Make sure those PUID and GUID match the ID for your user and group. You can find these by simply typing "id" into terminal. If they don't match replace the PUID and GUID in the docker compose script with the ones you found in terminal.
-
-# VPN Docker Config
-
-We will use Gluetun to setup your VPN connection in a Docker container. This way, services that rely on the VPN such as qbittorrent can access it while the host and public facing services do not.
-
-The exact configuration will vary based on which VPN provider you use. I recommend one that allows for port forwarding, as it will allow you to seed more reliably. This may not be important if you only use public trackers, but most private trackers are strict about maintaining a good seeding ratio. I will leave this shell for you to fill in with your VPN info. For more information on how to set it up, please see the [Gluetun documentation](https://github.com/qdm12/gluetun).
-
-```
-  gluetun:
-    image: qmcgaw/gluetun
-    # container_name: gluetun
-    # line above must be uncommented to allow external containers to connect.
-    # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/connect-a-container-to-gluetun.md#external-container-to-gluetun
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    ports:
-      - 8888:8888/tcp # HTTP proxy
-      - 8388:8388/tcp # Shadowsocks
-      - 8388:8388/udp # Shadowsocks
-      - 8080:8080 # qbittorrent
-      - 9696:9696 # prowlarr
-      - 8191:8191 # flaresolverr
-    volumes:
-      - ./gluetun:/gluetun
-    environment:
-      # See https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
-      - PUID=1000
-      - PGID=1000
-      - VPN_SERVICE_PROVIDER=ivpn
-      - VPN_TYPE=openvpn
-      # OpenVPN:
-      - OPENVPN_USER=
-      - OPENVPN_PASSWORD=
-      # Wireguard:
-      # - WIREGUARD_PRIVATE_KEY={YOUR PRIVATE KEY}
-      # - WIREGUARD_ADDRESSES={YOUR ADDRESSES}
-      # Timezone for accurate log times
-      - TZ=
-      # Server list updater
-      # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/servers.md#update-the-vpn-servers-list
-      - UPDATER_PERIOD=
-```
-
-# qBittorrent Docker Config
-
-```
-qbittorrent:
-    image: ghcr.io/linuxserver/qbittorrent
-    container_name: qbittorrent
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - WEBUI_PORT=8080
-    volumes:
-      - ./qbittorrent:/config
-      - /path/to/qbittorrent-downloads:/downloads
-    network_mode: service:gluetun
-    restart: unless-stopped
- ```
-
-Replace /path/to/qbittorrent-downloads with the directory you would like qBittorrent to store downloads.
-
-We added network_mode: service:gluetun here so that all qbittorrent traffic gets routed through the VPN container.
-
-Notice that we did not add the ports: section. When routing network traffic through another container, the ports have to be defined in the VPN container instead.
-
-# Prowlarr Docker Config
-
-```
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:develop
-    container_name: prowlarr
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-    volumes:
-      - ./prowlarr:/config
-    network_mode: service:gluetun
-    ports:
-      - 9696:9696
-    restart: unless-stopped
-```
-
-This is super basic and just boots your Prowlarr service on port 9696. Doesn’t need much else!
-
-# Flaresolverr
-```
-  flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
-    container_name: flaresolverr
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-    network_mode: service:gluetun
-    volumes:
-      - ./flaresolver:/config
-    restart: unless-stopped
-```
-
-# Sonarr & Radarr Docker Config
-
-```
-  sonarr:
-    image: ghcr.io/linuxserver/sonarr
-    container_name: sonarr
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=EST
-    volumes:
-      - ./sonarr:/config
-      - /path/to/media/tv:/tv
-      - /path/to/qbittorrent-downloads:/downloads
-    ports:
-      - 8989:8989
-    restart: unless-stopped
-  radarr:
-    image: ghcr.io/linuxserver/radarr
-    container_name: radarr
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=EST
-    volumes:
-      - ./radarr:/config
-      - /path/to/media/movies:/movies
-      - /path/to/qbittorrent-downloads:/downloads
-    ports:
-      - 7878:7878
-    restart: unless-stopped
- ```
-Replace /path/to/media/tv & /path/to/media/movies with the directories you created during the Plex docker setup. Replace /path/to/qbittorrent-downloads with the directory you created during the qBittorrent docker setup.
-
-Make sure that user has read-write permissions for the media directories. Sonarr and Radarr are going to try to be creating folders and files in there when they copy or hard link files over. You can do this with the following command: ```chmod -r +rw /path/to/media```
-
-# Start it up!
-
-Run this command to boot up all your services! Remember to go back and update your qBittorrent settings after this.
-
-```
-cd ~/docker
-docker compose up -d
-```
-
-You now have these services running locally. Go to their web UI’s and configure everything.
-
-```
-sonarr       @ http://localhost:8989
-radarr       @ http://localhost:7878
-prowlarr     @ http://localhost:9696
-qbittorrent  @ http://localhost:8080
-jellyfin     @ http://localhost:8096
-```
-
-# Configuration
-
-## Jellyfin
-
-1. Navigate to http://localhost:8096
-2. Follow the setup wizard
-3. Add libraries for TV and Movies. The library folders should be located at /media/movies and /media/tv respectively.
-
-See [documentation](https://jellyfin.org/docs/general/quick-start.html) for more information
-
-## qBittorrent
-
-### Set Download Directory
-
-1. Navigate to qBittorrent Web UI at http://localhost:8080
-2. Click on Tools > Options
-3. Under the "Downloads" tab change "Default Save Path" to /downloads/completed
-4. Check the box next to "Keep incomplete torrents in:" Make sure it's set to /downloads/incomplete
-
-### Bind qBittorrent to VPN
-
-This will ensure that qBittorrent only downloads over your VPN connection.
-
-1. Navigate to qBittorrent Web UI at http://localhost:8080
-2. Click on Tool > Options
-3. Go to the Advanced tab
-4. Change Network interface from Any to the interface corresponding to your VPN (probably something like tun0)
-
-### Change default login (Optional)
-
-By default the login to the web UI is just "admin" "adminadmin". Personally I don't find it worth changing since qBittorrent is only accessible through my home network. I wouldn't recommend making it publically available unless you have a good reason, but if you do you should at least change the default login.
-
-1. Navigate to Tools > Options > WebUI > Authentication
-3. Enter a secure username and password.
-
-## Update 10/25/25:
-Newer installs of qBittorrent reportedly generate a random password on install. This password can be found by running `docker logs qbittorrent`.
-
-## Prowlarr
-
-See [Prowlarr Quick Start Guide](https://wiki.servarr.com/prowlarr/quick-start-guide)
-
-## Sonarr / Radarr
-
-### Connect to qBittorrent
-
-1. Navigate to Settings > Downloads Clients > Add
-2. Select "qBittorrent"
-3. Enter "qBittorrent" in the "Name" field
-4. Set host and port to the qBittorrent Web UI. If you followed this guide correctly the default values should be correct
-5. Enter the Username and Password for the webui
-6. Click "Save"
-
-
-### Set root directory
-
-1. Navigate to Settings > Media Management
-2. Scroll to the bottom of the page and click on "Add Root Folder"
-3. Sonarr: Select /tv
-4. Radarr: Select /movies
-
-### Create quality profile
-
-You will want to create a quality profile to specify what resolution you want your TV Shows and Movies to be.
-
-1. Navigate to Settings > Profiles
-3. Select the Any profile
-4. Check all qualities you would like to allow and uncheck all qualities you would like to disable. For example if you want your movie quality to cap out at 1080p to save disk space uncheck everything above Bluray-1080p. Sonarr/Radarr will prioritize the highest allowed resolution but will download lower allowed ones if it can't find it.
-5. (Optional) Allow upgrades by checking the "Upgrades Allowed" Checkbox. You can then change the "Upgrade Until" drop down to your prefered maximum resolution. This is useful for if you want your library to be entirely 1080p but the only torrent available for a specific show or movie is 720p. This way it will still download the 720p torrent but if a 1080p torrent ever comes along it will automatically download it and replace the 720p version.
-
-
-### File renaming (Optional)
-
-I like having this setting enabled to keep my media folders nice and organized.
-
-1. Navigate to Settings > Media Management
-2. Check the checkbox under "Rename Episodes/Movies"
-3. (Optional) Configure episode format by preference
-
-### Connect Sonarr and Radarr
-
-**Sonarr:**
-
-1. Navigate to Settings > TV > Sonarr
-2. Check "Enable" "V3" and "Scan for Availability"
-3. Enter hostname and port. If you followed this guide correctly it should just be localhost:8989
-4. Enter API key. You can find this in Sonarr under Settings > General
-5. Leave base URL blank unless you configured one in Sonarr
-6. Under Sonarr Interface click on "Load Qualities", "Load Folders", and "Load Languages"
-7. Select "Any" under Quality Profiles
-8. Select /tv under Default Root Folders
-9. Select your prefered languages under Language Profiles
-
-
-**Radarr:**
-
-
-1. Navigate to Settings > Movies > Radarr
-2. Check "Enable" "V3" and "Scan for Availability"
-3. Enter hostname and port. If you followed this guide correctly it should just be localhost:7878
-4. Enter API key. You can find this in Radarr under Settings > General
-5. Leave base URL blank unless you configured one in Radarr
-6. Under Radarr Interface click on "Load Profiles" and "Load Root Folders"
-7. Select "Any" under Quality Profiles
-8. Select /movies under Default Root Folders
-9. Select Physical / Web under Default Minimum Availability. Optionally you could select and earlier setting in case a movie gets leaked before being released to DVD but you will more often than not probably just get cam recordings.
-
-# Advanced Configuration
-
-**Multiple Hard Drives**
-
-As your media library grows, you will eventually run into the issue of storage space. The obvious solution is to get more hard drives, but it's less obvious how to distribute files across multiple drives with this setup. The best solution in my experience is to use [MergerFS](https://github.com/trapexit/mergerfs). MergerFS essentially combines multiple hard drives into a single folder on your filesystem. Then you can point your '/path/to/media' folder to the MergerFS folder. As opposed to traditional solutions such as RAID, MergerFS allows any combination of drives regardless of brand or storage capacity. However, it does not provide any redundancy. It is possible to combine MergerFS with [SnapRAID](https://www.snapraid.it/) if you'd like some extra redundancy, but personally I have never used it.
-
-**Quality Control**
-
-The website [TRaSH Guides](https://trash-guides.info/Radarr/) is an amazing resource for setting up quality profile settings. By following these instructions you can achieve fine tuned quality control, such as prioritizing downloads from specific release groups, specific file formats (ex. prefer h.265 over h.264), and set file size limits.
+# Home Media Server
+
+<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
+
+- [Home Media Server](#home-media-server)
+    * [Performance/Hardware](#performancehardware)
+    * [Roadmap](#roadmap)
+    * [Installation](#installation)
+        + [Alpine Linux](#alpine-linux)
+        + [Tailscale](#tailscale)
+            - [ACL](#acl)
+        + [Docker](#docker)
+    * [Post Install](#post-install)
+        + [Configure base URL](#configure-base-url)
+            - [Jellyfin](#jellyfin)
+            - [Prowlarr, Sonarr, Radarr & Lidarr](#prowlarr-sonarr-radarr--lidarr)
+            - [qBittorrent](#qbittorrent)
+        + [Tailscale serve](#tailscale-serve)
+        + [Setup integrations](#setup-integrations)
+            - [Jellyfin](#jellyfin-1)
+            - [qBittorrent](#qbittorrent-1)
+            - [Prowlarr](#prowlarr)
+            - [Sonarr, Radarr & Lidarr](#sonarr-radarr--lidarr)
+    * [Debugging](#debugging)
+        + [Unable to add root folder - Folder '/tv/' is not writable by user 'abc'](#unable-to-add-root-folder---folder-tv-is-not-writable-by-user-abc)
+    * [Tips](#tips)
+        + [Expose setup to the internet using tailscale funnel](#expose-setup-to-the-internet-using-tailscale-funnel)
+
+<!-- TOC end -->
+
+A docker-compose setup of a media server. Covers viewing, installation, searching and managing various media. 
+Installation shows a complete example setup on alpine linux, but other OS' should work fine as the core applications are run from docker-compose.
+
+Setup includes by default:
+- [Jellyfin](https://jellyfin.org/docs/): Media manager/server, alternative to Plex. Allows viewing media files like videos, images, music etc.
+- [Prowlarr](https://wiki.servarr.com/prowlarr): Index manager/proxy for torrents. Lets other applications (e.g. sonarr and Radarr) search/query for media files from various torrent sites at once.
+- [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr): Proxy server to bypass cloudflare protections. To be used with [Prowlarr for specific sources](https://wiki.servarr.com/en/prowlarr/faq#can-i-use-flaresolverr-indexers).
+- [qBittorrent](https://www.qbittorrent.org/): Torrent manager/installer. To be used to actually download the torrents found by sonarr or radarr, queried to Prowlarr.
+- [Sonarr](https://wiki.servarr.com/sonarr): TV/Series manager. Search and install movies through qbittorrent (install) and prowlarr (query torrents) through integrations.
+- [Radarr](https://wiki.servarr.com/radarr): Movie manager. Search and install movies through qbittorrent (install) and prowlarr (query torrents) through integrations.
+- [Lidarr](https://wiki.servarr.com/lidarr/quick-start-guide): Music manager. Search and install music through qbittorrent (install) and prowlarr (query torrents) through integrations.
+- [Gluetun](https://github.com/qdm12/gluetun?tab=readme-ov-file#setup): Run VPN in a container, to be used by other containers as a network interface. Just saves a lot of hassle.
+- [Docker](https://wiki.alpinelinux.org/wiki/Docker): To manage everything in containers. Allows for quick and contained deployment.
+
+Adding another service to the list is easy. Just create another container for it. If you search for e.g. "kapowarr docker container" you should find [steps to add it to the docker-compose](https://casvt.github.io/Kapowarr/installation/docker/#__tabbed_4_2).
+For inspiration and ideas, see [Awesome arr](https://github.com/Ravencentric/awesome-arr?tab=readme-ov-file) which lists many arr applications.
+
+## Performance/Hardware
+I am able to run it comfortably on **2 core, 4GB RAM, 4GB swap alpine linux virtual machine**. Even then, I believe you can get away with **1 core, 2GB RAM and 4GB swap**.
+The more disk space, the merrier. Running on an HDD is fine. If you want a "better" setup, I would mount `/` on an SSD/NVME, 
+then update the media files to be on a mounted HDD drive ([LVM](https://wiki.alpinelinux.org/wiki/Setting_up_Logical_Volumes_with_LVM) recommended for expansion).
+
+**NOTE**: I have not tried streaming 4K 60fps videos or equivalent on this setup. The requirements may change based on your uses. 
+[Jellyfin documentation](https://jellyfin.org/docs/general/post-install/transcoding/hardware-acceleration/#supported-acceleration-methods) holds more information on it, where you may even want a dedicated GPU.
+
+## Roadmap
+- [ ] Setup subtitles service for movies/tv/anime
+- [ ] Refine container user:group permissions
+- [ ] Setup script to run (folders, permissions, boilerplate config with completed integrations etc.)
+- [ ] Create TOC for README
+- [ ] Setup simple health checks and dependency logic for all services
+
+## Installation
+### Alpine Linux
+[Alpine linux](https://docs.alpinelinux.org/user-handbook/0.1a/Working/post-install.html) is a lightweight linux distro.
+[Install](https://alpinelinux.org/downloads/) and boot into Alpine Linux Virtual Machine. Where you choose to install it up to you, 
+for example on [Proxmox VE](https://www.proxmox.com/en/products/proxmox-virtual-environment/overview).
+
+Following steps assumes you are running as root (as sudo is not installed by default on alpine linux):
+- Run `setup-alpine` and follow the prompts.
+- Update to [edge packages](https://wiki.alpinelinux.org/wiki/Include:Upgrading_to_Edge).
+- Run commands to install sudo and docker, as well as autostart it on boot.
+````
+apk add sudo docker docker-compose
+rc-update add docker default
+/etc/init.d/docker start
+````
+Don't forget to [add your user to sudoers](https://ostechnix.com/add-delete-and-grant-sudo-privileges-to-users-in-alpine-linux/). Otherwise, they cannot use sudo.
+If you want to run docker commands without sudo, run `sudo addgroup <my-user> docker`.
+
+### Tailscale
+[Tailscale](https://tailscale.com/kb/1017/install) is "your own private network", in simpler terms. It can be used to access your services
+outside your own local - home - network. Not strictly necessary, but here it serves the purpose of both allowing access outside your home network, and serving the content with HTTPS.
+If you choose not to use tailscale, you will need to set up TLS/HTTPS and network access on your own. **DO NOT SKIMP OUT ON SETTING UP HTTPS. HTTP IS NOT SAFE!**
+
+I will not go through setting up an entire tailscale network. There are [plenty of videos/documentation for that](https://tailscale.com/kb/1017/install). I will just give a working ACL and `tailscale serve` config to apply.
+
+#### ACL
+A minimum [tailscale ACL (JSON Editor)](https://login.tailscale.com/admin/acls/file) like below should work fine. When testing, you can set a grant for all IPs with `*` just to debug during the setup phase.
+````json
+{
+    "tagOwners": {
+    "tag:media-server":             ["my-email@example.com"],
+    "tag:media-server-all-access":  ["my-email@example.com"]
+    },
+
+	"tests": [
+		{
+			"src":    "tag:media-server-all-access",
+			"accept": ["tag:media-server:80", "tag:media-server:443"],
+			"deny":   ["tag:media-server:12832"]
+		}
+	],
+ 
+	"grants": [
+		{
+			"src": ["tag:media-server-all-access"],
+			"dst": ["tag:media-server"],
+			"ip":  ["tcp:80", "tcp:443"]
+		}
+	]
+}
+````
+Give the media servers the tag `media-server` and your client `media-server-all-access`. You can separate them further as fits your needs.
+
+Tailscale serve config is set up later in [Post Install > Tailscale Serve](#tailscale-serve).
+
+### Docker
+Assumes you have installed docker and docker-compose.
+Run the application in the same directory as the docker-compose.yml file is in with
+````
+docker-compose up -d
+````
+Commands below are useful for debugging the containers.
+````bash
+docker ps                         # to see service status
+docker logs <container>           # To see service logs. E.g. "docker logs jellyfin"
+docker stats                      # Performance/usage of running containers
+docker exec -it <container> bash  # Start bash shell in container to run other commands, e.g. "ls -lah" to check file permissions
+````
+
+## Post Install
+Now we assume you can see all the containers when using `docker ps`, and they are healthy! First off, congrats!
+You can access the HTTP version of the websites at (IPs/domains will differ from yours)
+
+| Service     | URL                                |
+|-------------|------------------------------------|
+| Jellyfin    | `http://100.122.39.113:8096`       |
+| qBittorrent | `http://100.122.39.113:8080`       |
+| Prowlarr    | `http://100.122.39.113:9696`       |
+| Sonarr      | `http://100.122.39.113:8989`       |
+| Radarr      | `http://100.122.39.113:7878`       |
+| Lidarr      | `http://100.122.39.113:8686`       |
+Make sure you can access the web UI of each through your browser. Verify the tailscale ACL or any firewalls aren't blocking you, and check docker logs if issues arise.
+Now, we will update the base URL in the configuration of each service, to afterward setup HTTPS using [tailscale serve](https://tailscale.com/kb/1242/tailscale-serve).
+
+**NOTE**: qBittorrent credentials for first sign-in can be found in logs. Use `docker logs qbittorrent`. Afterward, change it in `Tools > Options > WebUI > Authentication`.
+
+### Configure base URL
+**NOTE**: Upon making changes to base url for each service below, it will be inaccessible before you run the corresponding tailscale serve command.
+If you make a mistake, most (if not all) services have config files you can edit on the host, then just restart the container to revert it.
+You may want to create a backup before continuing, just in case.
+
+#### Jellyfin
+Go to http://100.122.39.113:8096, follow the setup wizard and when setting media paths, set them as `/media/movies`, `/media/tv`, `/media/music` etc.
+It automatically detects changes in these files. These files are added by other services, e.g. radarr (movies), sonarr (tv) & lidarr (music).
+
+Once in the main dashboard, click on your profile in the top-right, and click on `Administration > Dashboard`.
+Here, Find on the left sidebar `Advanced > Networking > Server Address Settings > Base URL` and set it to `/jellyfin` and enable HTTPS.
+
+#### Prowlarr, Sonarr, Radarr & Lidarr
+All 4 have about the same UI. Create an account and follow the same steps for all of them, replacing the `URL Base value` to their respective service names prefixed with `/`, for example `/lidarr` for lidarr.
+
+| Service     | URL                           |
+|-------------|-------------------------------|
+| Prowlarr    | `http://100.122.39.113:9696`  |
+| Sonarr      | `http://100.122.39.113:8989`  |
+| Radarr      | `http://100.122.39.113:7878`  |
+| Lidarr      | `http://100.122.39.113:8686`  |
+
+#### qBittorrent
+Does not seem to support setting a base URL. Skip for now.
+
+### Tailscale serve
+[tailscale serve](https://tailscale.com/kb/1242/tailscale-serve) will set up the domain and url path with HTTPS for us. Saves a great deal of time.
+
+Run commands
+
+| Service     | Command                                                                                          | Notes                                                                             |
+|-------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| Jellyfin    | `sudo tailscale serve --bg --https=443 --set-path /jellyfin http://127.0.0.1:8096/jellyfin`      | Requires Jellyfin "Base URL" = `/jellyfin`                                        |
+| qBittorrent | `sudo tailscale serve --bg --https=443 http://127.0.0.1:8080`                                    | qBittorrent does **not** support Base URL / path prefix                           |
+| Prowlarr    | `sudo tailscale serve --bg --https=443 --set-path /prowlarr http://127.0.0.1:9696/prowlarr`      | Set "Base URL" = `/prowlarr`                                                      |
+| Sonarr      | `sudo tailscale serve --bg --https=443 --set-path /sonarr http://127.0.0.1:8989/sonarr`          | Set "Base URL" = `/sonarr`                                                        |
+| Radarr      | `sudo tailscale serve --bg --https=443 --set-path /radarr http://127.0.0.1:7878/radarr`          | Set "Base URL" = `/radarr`                                                        |
+| Lidarr      | `sudo tailscale serve --bg --https=443 --set-path /lidarr http://127.0.0.1:8686/lidarr`          | Set "Base URL" = `/lidarr`                                                        |
+
+Now, you should be able to reach the pages using (updating the URL to your environment)
+
+| Service     | URL                                                      |
+|-------------|----------------------------------------------------------|
+| Jellyfin    | `https://my-host.tail1c2ub3.ts.net/jellyfin`             |
+| qBittorrent | `https://my-host.tail1c2ub3.ts.net`                      |
+| Prowlarr    | `https://my-host.tail1c2ub3.ts.net/prowlarr`             |
+| Sonarr      | `https://my-host.tail1c2ub3.ts.net/sonarr`               |
+| Radarr      | `https://my-host.tail1c2ub3.ts.net/radarr`               |
+| Lidarr      | `https://my-host.tail1c2ub3.ts.net/lidarr`               |
+
+### Setup integrations
+It is assumed you have all docker containers running and can be connected to with HTTPS for these steps. If using tailscale, you should've already had a look around to set the `base url` in configuration (either through files or in the web UI).
+
+**NOTE**: Services accept very different references to other containers/integrations. Some accept `localhost`, some accept e.g. `100.122.39.113` (tailscale IP), some accept the url `https://my-host.tail1c2ub3.ts.net/prowlarr` etc.
+Try different variations and run the test to figure out which one works.
+
+Below are bare-minimum configuration to set up the integrations and have a working setup. I strongly recommend you look around in their respective documentation after you confirm it works.
+**NOTE**: Service order is intentional.
+
+#### Jellyfin
+1. Go to https://my-host.tail1c2ub3.ts.net/jellyfin
+2. follow the setup wizard and when setting media paths, set them as `/media/movies`, `/media/tv`, `/media/music` etc.
+
+It automatically detects changes in these files. These files are added by other services, e.g. radarr (movies), sonarr (tv) & lidarr (music).
+
+#### qBittorrent
+1. Go to https://my-host.tail1c2ub3.ts.net. 
+2. Change `Tools > Options > Advanced > qBittorrent Section > Network interface`, and set it to the VPN interface. Likely `tun0`.
+3. Verify `Tools > Options > Downloads > Saving Management > Default Save Path` is set to `/downloads`, and incomplete torrents kept in `/downloads/incomplete`.
+4. Tweak the rest to your personal preference. Default works fine.
+
+#### Prowlarr
+1. Go to https://my-host.tail1c2ub3.ts.net/prowlarr.
+2. In `Settings > Download Clients` add qBittorrent and fill in the form.
+3. In `Settings > Indexers > Indexer Proxies` add FlareSolverr and fill in the form.
+4. In `Settings > Apps > Applications` add Lidarr, Radarr and Sonarr and fill in the form. 
+   API keys are retrieved from the targeted applications web UI under `Settings > General > Security > API Key`.
+
+#### Sonarr, Radarr & Lidarr
+1. In `Settings > Media Management > Root Folders` add the corresponding root folder and fill in the form. If issues arise, check [debugging](#debugging), 
+   e.g. [Folder '/tv/' is not writable by user 'abc'](#unable-to-add-root-folder---folder-tv-is-not-writable-by-user-abc).
+2. In `Settings > Download Clients` add qBittorrent and fill in the form.
+3. In `Settings > Media Management > Movie/Track/Episode Naming > Rename Movies/Tracks/Episodes` I recommend turning it on.
+
+| Service     | URL                                                      | Root Folder |
+|-------------|----------------------------------------------------------|-------------|
+| Sonarr      | `https://my-host.tail1c2ub3.ts.net/sonarr`               | `/tv`       |
+| Radarr      | `https://my-host.tail1c2ub3.ts.net/radarr`               | `/movies`   |
+| Lidarr      | `https://my-host.tail1c2ub3.ts.net/lidarr`               | `/music`    |
+
+## Debugging
+### Unable to add root folder - Folder '/tv/' is not writable by user 'abc'
+Permission errors related to [GitHub issue](https://github.com/linuxserver/docker-radarr/issues/30). Can appear on sonarr or radarr when adding `root folder`.
+Happens because the mounted file is owned by `root:root` (check with `docker exec -it <container> bash -c "ls -lah <folder>"`) instead of `abc:users`.
+To fix it, run associated
+````bash
+docker exec -it sonarr bash -c "chown -R abc:users /tv"
+docker exec -it radarr bash -c "chown -R abc:users /movies"
+docker exec -it lidarr bash -c "chown -R abc:users /music"
+````
+This is at best a workaround, however. A permanent solution would be a remake of the user:group permissions which is on the roadmap, or setup entrypoint which sets permissions before mounting.
+
+## Tips
+### Expose setup to the internet using tailscale funnel
+If you want to expose your setup to the internet (not recommended, but ultimately up to you if you accept and understand the associated risks), an option to those who've already used tailscale to serve the website is [tailscale funnel](https://tailscale.com/kb/1223/funnel).
+Not tried it myself, but should work wonders for this type of setup.

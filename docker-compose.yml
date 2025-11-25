@@ -1,0 +1,119 @@
+# Docker compose to run media server
+#
+# Each container has their own respective website you'll need to access to configure the connections.
+# This merely starts all the containers and lets them access each other (assuming no firewalls are blocking them)
+#
+# Run with: 'sudo docker-compose up -d'
+
+services:
+  jellyfin:
+    image: ghcr.io/linuxserver/jellyfin
+    container_name: jellyfin
+    environment:
+      - PUID=${PROJECT_PUID}
+      - PGID=${PROJECT_PGID}
+    volumes:
+      - ${PROJECT_PATH}/jellyfin:/config
+      - ${PROJECT_PATH}/media:/media
+    ports:
+      - "8096:8096/tcp"
+    restart: unless-stopped
+  gluetun:
+    image: qmcgaw/gluetun
+    # container_name: gluetun
+    # line above must be uncommented to allow external containers to connect.
+    # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/connect-a-container-to-gluetun.md#external-container-to-gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "8888:8888/tcp" # HTTP proxy
+      - "8388:8388/tcp" # Shadowsocks
+      - "8388:8388/udp" # Shadowsocks
+      - "8080:8080/tcp" # qbittorrent
+      - "9696:9696/tcp" # prowlarr
+      - "8191:8191/tcp" # flaresolverr
+    volumes:
+      - ./gluetun:/gluetun
+    restart: unless-stopped
+    environment:
+      - PUID=${PROJECT_PUID}
+      - PGID=${PROJECT_PGID}
+      # See https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
+      # Mullvad VPN config example
+      - VPN_SERVICE_PROVIDER=${VPN_PROVIDER}
+      - VPN_TYPE=${VPN_TYPE}
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - SERVER_CITIES=${SERVER_CITIES}
+  qbittorrent:
+      image: ghcr.io/linuxserver/qbittorrent
+      container_name: qbittorrent
+      environment:
+        - PUID=${PROJECT_PUID}
+        - PGID=${PROJECT_PGID}
+        - WEBUI_PORT=8080
+      volumes:
+        - ${PROJECT_PATH}/qbittorrent:/config
+        - ${PROJECT_PATH}/qbittorrent-downloads:/downloads
+      network_mode: service:gluetun
+      restart: unless-stopped
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=${PROJECT_PUID}
+      - PGID=${PROJECT_PGID}
+    volumes:
+      - ${PROJECT_PATH}/prowlarr:/config
+    network_mode: service:gluetun
+    restart: unless-stopped
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - PUID=${PROJECT_PUID}
+      - PGID=${PROJECT_PGID}
+    network_mode: service:gluetun
+    volumes:
+      - ${PROJECT_PATH}/flaresolverr:/config
+  sonarr:
+    image: ghcr.io/linuxserver/sonarr
+    container_name: sonarr
+    environment:
+      - PUID=${PROJECT_PUID}
+      - PGID=${PROJECT_PGID}
+    volumes:
+      - ${PROJECT_PATH}/sonarr:/config
+      - ${PROJECT_PATH}/media/tv:/tv
+      - ${PROJECT_PATH}/qbittorrent-downloads:/downloads
+    ports:
+      - "8989:8989/tcp"
+    restart: unless-stopped
+  radarr:
+    image: ghcr.io/linuxserver/radarr
+    container_name: radarr
+    environment:
+      - PUID=${PROJECT_PUID}
+      - PGID=${PROJECT_PGID}
+    volumes:
+      - ${PROJECT_PATH}/radarr:/config
+      - ${PROJECT_PATH}/media/movies:/movies
+      - ${PROJECT_PATH}/qbittorrent-downloads:/downloads
+    ports:
+      - "7878:7878/tcp"
+    restart: unless-stopped
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    environment:
+      - PUID=${PROJECT_PUID}
+      - PGID=${PROJECT_PGID}
+    volumes:
+      - ${PROJECT_PATH}/lidarr:/config
+      - ${PROJECT_PATH}/media/music:/music
+      - ${PROJECT_PATH}/qbittorrent-downloads:/downloads
+    ports:
+      - "8686:8686/tcp"
+    restart: unless-stopped
