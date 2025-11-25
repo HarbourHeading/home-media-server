@@ -60,8 +60,9 @@ then update the media files to be on a mounted HDD drive ([LVM](https://wiki.alp
 ## Roadmap
 - [ ] Setup subtitles service for movies/tv/anime
 - [ ] Refine container user:group permissions
-- [ ] Setup script to run (folders, permissions, boilerplate config with completed integrations etc.)
+- [ ] Setup `install.sh` script to run. Setup folders, permissions, boilerplate config with completed integrations etc.
 - [ ] Setup simple health checks and dependency logic for all services
+- [ ] Provide Maintenance guide as a header. Updating, backup config, Health checks etc.
 
 ## Installation
 ### Alpine Linux
