@@ -3,6 +3,7 @@
 <!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
 
 - [Home Media Server](#home-media-server)
+    * [Overview](#overview)
     * [Performance/Hardware](#performancehardware)
     * [Roadmap](#roadmap)
     * [Installation](#installation)
@@ -28,10 +29,12 @@
 
 <!-- TOC end -->
 
+## Overview
+
 A docker-compose setup of a media server. Covers viewing, installation, searching and managing various media. 
 Installation shows a complete example setup on alpine linux, but other OS' should work fine as the core applications are run from docker-compose.
 
-Setup includes by default:
+Included services from setup:
 
 | Service                                                              | Description                                                                                                                                                               |
 |----------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -47,7 +50,7 @@ Setup includes by default:
 
 
 Adding another service to the list is easy. Just create another container for it. If you search for e.g. "kapowarr docker container" you should find [steps to add it to the docker-compose](https://casvt.github.io/Kapowarr/installation/docker/#__tabbed_4_2).
-For inspiration and ideas, see [Awesome arr](https://github.com/Ravencentric/awesome-arr?tab=readme-ov-file) which lists many arr applications.
+For inspiration and ideas, see for example [Awesome arr](https://github.com/Ravencentric/awesome-arr?tab=readme-ov-file), which lists many arr applications.
 
 ## Performance/Hardware
 I am able to run it comfortably on **2 core, 4GB RAM, 4GB swap alpine linux virtual machine**. Even then, I believe you can get away with **1 core, 2GB RAM and 4GB swap**.
@@ -62,7 +65,7 @@ then update the media files to be on a mounted HDD drive ([LVM](https://wiki.alp
 - [ ] Refine container user:group permissions
 - [ ] Setup `install.sh` script to run. Setup folders, permissions, boilerplate config with completed integrations etc.
 - [ ] Setup simple health checks and dependency logic for all services
-- [ ] Provide Maintenance guide as a header. Updating, backup config, Health checks etc.
+- [ ] Add Maintenance guide. Updating, backup config, Health checks, automatic media cleanup etc.
 
 ## Installation
 ### Alpine Linux
@@ -90,7 +93,7 @@ If you choose not to use tailscale, you will need to set up TLS/HTTPS and networ
 I will not go through setting up an entire tailscale network. There are [plenty of videos/documentation for that](https://tailscale.com/kb/1017/install). I will just give a working ACL and `tailscale serve` config to apply.
 
 #### ACL
-A minimum [tailscale ACL (JSON Editor)](https://login.tailscale.com/admin/acls/file) like below should work fine. When testing, you can set a grant for all IPs with `*` just to debug during the setup phase.
+A minimum [tailscale ACL (JSON Editor)](https://login.tailscale.com/admin/acls/file) like below should work fine. When testing, you can set a grant for all IPs with `"ip": ["tcp:*"]` just to debug during the setup phase.
 ````json
 {
     "tagOwners": {
@@ -121,6 +124,12 @@ Tailscale serve config is set up later in [Post Install > Tailscale Serve](#tail
 
 ### Docker
 Assumes you have installed docker and docker-compose.
+
+Before running it, read through the docker-compose to get an understanding of what it does, and see if you need
+to make any changes to the [gluetun service](https://github.com/HarbourHeading/home-media-server/blob/main/docker-compose.yml#L21-L49) (e.g. changing VPN provider) and the `.env` file.
+Update `.env.example` -> `.env` with command `mv .env.example .env` in the same directory that holds the `docker-compose.yml` file.
+Update the `.env` as needed and according to changes you make to the gluetun service in docker-compose. Read the [gluetun setup docs](https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup).
+
 Run the application in the same directory as the docker-compose.yml file is in with
 ````
 docker-compose up -d
@@ -181,14 +190,14 @@ Does not seem to support setting a base URL. Skip for now.
 
 Run commands
 
-| Service     | Command                                                                                          | Notes                                                                             |
-|-------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| Jellyfin    | `sudo tailscale serve --bg --https=443 --set-path /jellyfin http://127.0.0.1:8096/jellyfin`      | Requires Jellyfin "Base URL" = `/jellyfin`                                        |
-| qBittorrent | `sudo tailscale serve --bg --https=443 http://127.0.0.1:8080`                                    | qBittorrent does **not** support Base URL / path prefix                           |
-| Prowlarr    | `sudo tailscale serve --bg --https=443 --set-path /prowlarr http://127.0.0.1:9696/prowlarr`      | Set "Base URL" = `/prowlarr`                                                      |
-| Sonarr      | `sudo tailscale serve --bg --https=443 --set-path /sonarr http://127.0.0.1:8989/sonarr`          | Set "Base URL" = `/sonarr`                                                        |
-| Radarr      | `sudo tailscale serve --bg --https=443 --set-path /radarr http://127.0.0.1:7878/radarr`          | Set "Base URL" = `/radarr`                                                        |
-| Lidarr      | `sudo tailscale serve --bg --https=443 --set-path /lidarr http://127.0.0.1:8686/lidarr`          | Set "Base URL" = `/lidarr`                                                        |
+| Service     | Command                                                                                     | Notes                                                               |
+|-------------|---------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| Jellyfin    | `sudo tailscale serve --bg --https=443 --set-path /jellyfin http://127.0.0.1:8096/jellyfin` | Requires Jellyfin "Base URL" = `/jellyfin`                          |
+| qBittorrent | `sudo tailscale serve --bg --https=443 http://127.0.0.1:8080`                               | qBittorrent does **not** support Base URL / path prefix. Set as `/` |
+| Prowlarr    | `sudo tailscale serve --bg --https=443 --set-path /prowlarr http://127.0.0.1:9696/prowlarr` | Set "Base URL" = `/prowlarr`                                        |
+| Sonarr      | `sudo tailscale serve --bg --https=443 --set-path /sonarr http://127.0.0.1:8989/sonarr`     | Set "Base URL" = `/sonarr`                                          |
+| Radarr      | `sudo tailscale serve --bg --https=443 --set-path /radarr http://127.0.0.1:7878/radarr`     | Set "Base URL" = `/radarr`                                          |
+| Lidarr      | `sudo tailscale serve --bg --https=443 --set-path /lidarr http://127.0.0.1:8686/lidarr`     | Set "Base URL" = `/lidarr`                                          |
 
 Now, you should be able to reach the pages using (updating the URL to your environment)
 
@@ -208,7 +217,7 @@ It is assumed you have all docker containers running and can be connected to wit
 Try different variations and run the test to figure out which one works.
 
 Below are bare-minimum configuration to set up the integrations and have a working setup. I strongly recommend you look around in their respective documentation after you confirm it works.
-**NOTE**: Service order is intentional.
+**NOTE**: Order of operation is intentional. Recommended is to do them top to bottom, as listed.
 
 #### Jellyfin
 1. Go to https://my-host.tail1c2ub3.ts.net/jellyfin
@@ -228,6 +237,7 @@ It automatically detects changes in these files. These files are added by other 
 3. In `Settings > Indexers > Indexer Proxies` add FlareSolverr and fill in the form.
 4. In `Settings > Apps > Applications` add Lidarr, Radarr and Sonarr and fill in the form. 
    API keys are retrieved from the targeted applications web UI under `Settings > General > Security > API Key`.
+5. Add sources/indexer(s) to query in `Indexers > Add Indexer`.
 
 #### Sonarr, Radarr & Lidarr
 1. In `Settings > Media Management > Root Folders` add the corresponding root folder and fill in the form. If issues arise, check [debugging](#debugging), 
@@ -244,7 +254,7 @@ It automatically detects changes in these files. These files are added by other 
 ## Debugging
 ### Unable to add root folder - Folder '/tv/' is not writable by user 'abc'
 Permission errors related to [GitHub issue](https://github.com/linuxserver/docker-radarr/issues/30). Can appear on sonarr or radarr when adding `root folder`.
-Happens because the mounted file is owned by `root:root` (check with `docker exec -it <container> bash -c "ls -lah <folder>"`) instead of `abc:users`.
+Happens because the mounted file is owned by `root:root` (check with `docker exec -it <container> bash -c "ls -lah"`) instead of `abc:users`.
 To fix it, run associated
 ````bash
 docker exec -it sonarr bash -c "chown -R abc:users /tv"
@@ -257,3 +267,5 @@ This is at best a workaround, however. A permanent solution would be a remake of
 ### Expose setup to the internet using tailscale funnel
 If you want to expose your setup to the internet (not recommended, but ultimately up to you if you accept and understand the associated risks), an option to those who've already used tailscale to serve the website is [tailscale funnel](https://tailscale.com/kb/1223/funnel).
 Not tried it myself, but should work wonders for this type of setup.
+
+
