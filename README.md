@@ -62,10 +62,10 @@ then update the media files to be on a mounted HDD drive ([LVM](https://wiki.alp
 
 ## Roadmap
 - [ ] Setup subtitles service for movies/tv/anime
-- [ ] Refine container user:group permissions
+- [ ] Refine container user:group permissions. Should not default to root
 - [ ] Setup `install.sh` script to run. Setup folders, permissions, boilerplate config with completed integrations etc.
-- [ ] Setup simple health checks and dependency logic for all services
 - [ ] Add Maintenance guide. Updating, backup config, Health checks, automatic media cleanup etc.
+- [ ] Ansible playbook template for automatic deployment. May replace maintenance guide
 
 ## Installation
 ### Alpine Linux
@@ -253,7 +253,7 @@ It automatically detects changes in these files. These files are added by other 
 
 ## Debugging
 ### Unable to add root folder - Folder '/tv/' is not writable by user 'abc'
-Permission errors related to [GitHub issue](https://github.com/linuxserver/docker-radarr/issues/30). Can appear on sonarr or radarr when adding `root folder`.
+Permission errors related to [GitHub issue](https://github.com/linuxserver/docker-radarr/issues/30). Can appear on sonarr, radarr or lidarr when adding `root folder`.
 Happens because the mounted file is owned by `root:root` (check with `docker exec -it <container> bash -c "ls -lah"`) instead of `abc:users`.
 To fix it, run associated
 ````bash

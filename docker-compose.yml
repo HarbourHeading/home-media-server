@@ -7,7 +7,7 @@
 
 services:
   jellyfin:
-    image: ghcr.io/linuxserver/jellyfin
+    image: ghcr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
     environment:
       - PUID=${PROJECT_PUID}
@@ -19,7 +19,7 @@ services:
       - "8096:8096/tcp"
     restart: unless-stopped
   gluetun:
-    image: qmcgaw/gluetun
+    image: qmcgaw/gluetun:latest
     # container_name: gluetun
     # line above must be uncommented to allow external containers to connect.
     # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/connect-a-container-to-gluetun.md#external-container-to-gluetun
@@ -47,8 +47,13 @@ services:
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
       - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       - SERVER_CITIES=${SERVER_CITIES}
+    healthcheck:
+      test: ping -c 1 kth.se || exit 1
+      interval: 20s
+      timeout: 10s
+      retries: 5
   qbittorrent:
-      image: ghcr.io/linuxserver/qbittorrent
+      image: ghcr.io/linuxserver/qbittorrent:latest
       container_name: qbittorrent
       environment:
         - PUID=${PROJECT_PUID}
@@ -59,8 +64,18 @@ services:
         - ${PROJECT_PATH}/qbittorrent-downloads:/downloads
       network_mode: service:gluetun
       restart: unless-stopped
+      depends_on:
+        gluetun:
+          condition: service_healthy
+          restart: true
+      healthcheck:
+        test: ping -c 1 kth.se || exit 1
+        interval: 60s
+        retries: 3
+        start_period: 20s
+        timeout: 10s
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:develop
+    image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
     environment:
       - PUID=${PROJECT_PUID}
@@ -79,7 +94,7 @@ services:
     volumes:
       - ${PROJECT_PATH}/flaresolverr:/config
   sonarr:
-    image: ghcr.io/linuxserver/sonarr
+    image: ghcr.io/linuxserver/sonarr:latest
     container_name: sonarr
     environment:
       - PUID=${PROJECT_PUID}
@@ -92,7 +107,7 @@ services:
       - "8989:8989/tcp"
     restart: unless-stopped
   radarr:
-    image: ghcr.io/linuxserver/radarr
+    image: ghcr.io/linuxserver/radarr:latest
     container_name: radarr
     environment:
       - PUID=${PROJECT_PUID}
