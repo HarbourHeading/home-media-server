@@ -31,7 +31,7 @@
 
 ## Overview
 
-A docker-compose setup of a media server. Covers viewing, installation, searching and managing various media. 
+A docker-compose setup of a media server. Covers viewing, installation, searching and managing various media.
 Installation shows a complete example setup on alpine linux, but other OS' should work fine as the core applications are run from docker-compose.
 
 Included services from setup:
@@ -52,12 +52,15 @@ Included services from setup:
 Adding another service to the list is easy. Just create another container for it. If you search for e.g. "kapowarr docker container" you should find [steps to add it to the docker-compose](https://casvt.github.io/Kapowarr/installation/docker/#__tabbed_4_2).
 For inspiration and ideas, see for example [Awesome arr](https://github.com/Ravencentric/awesome-arr?tab=readme-ov-file), which lists many arr applications.
 
+If you want are looking to improve your music/lidarr setup, look at [this guide by thewicklowwolf](https://thewicklowwolf.github.io/music-stack/), and at least use his [Lidatube](https://github.com/TheWicklowWolf/LidaTube) service.
+A commented out deployment of lidatube exists in the [docker-compose.yml](docker-compose.yml), but is not covered by the rest of the guide.
+
 ## Performance/Hardware
 I am able to run it comfortably on **2 core, 4GB RAM, 4GB swap alpine linux virtual machine**. Even then, I believe you can get away with **1 core, 2GB RAM and 4GB swap**.
-The more disk space, the merrier. Running on an HDD is fine. If you want a "better" setup, I would mount `/` on an SSD/NVME, 
+The more disk space, the merrier. Running on an HDD is fine. If you want a "better" setup, I would mount `/` on an SSD/NVME,
 then update the media files to be on a mounted HDD drive ([LVM](https://wiki.alpinelinux.org/wiki/Setting_up_Logical_Volumes_with_LVM) recommended for expansion).
 
-**NOTE**: I have not tried streaming 4K 60fps videos or equivalent on this setup. The requirements may change based on your uses. 
+**NOTE**: I have not tried streaming 4K 60fps videos or equivalent on this setup. The requirements may change based on your uses.
 [Jellyfin documentation](https://jellyfin.org/docs/general/post-install/transcoding/hardware-acceleration/#supported-acceleration-methods) holds more information on it, where you may even want a dedicated GPU.
 
 ## Roadmap
@@ -70,8 +73,8 @@ then update the media files to be on a mounted HDD drive ([LVM](https://wiki.alp
 ## Installation
 ### Alpine Linux
 [Alpine linux](https://docs.alpinelinux.org/user-handbook/0.1a/Working/post-install.html) is a lightweight linux distro.
-[Install](https://alpinelinux.org/downloads/) and boot into Alpine Linux Virtual Machine. Where you choose to install it up to you, 
-for example on [Proxmox VE](https://www.proxmox.com/en/products/proxmox-virtual-environment/overview).
+[Install](https://alpinelinux.org/downloads/) and boot into Alpine Linux Virtual Machine. Where you choose to install it is up to you,
+for example on [Proxmox VE](https://www.proxmox.com/en/products/proxmox-virtual-environment/overview) or [Ubuntu Server](https://ubuntu.com/download/server).
 
 Following steps assumes you are running as root (as sudo is not installed by default on alpine linux):
 - Run `setup-alpine` and follow the prompts.
@@ -226,7 +229,7 @@ Below are bare-minimum configuration to set up the integrations and have a worki
 It automatically detects changes in these files. These files are added by other services, e.g. radarr (movies), sonarr (tv) & lidarr (music).
 
 #### qBittorrent
-1. Go to https://my-host.tail1c2ub3.ts.net. 
+1. Go to https://my-host.tail1c2ub3.ts.net.
 2. Change `Tools > Options > Advanced > qBittorrent Section > Network interface`, and set it to the VPN interface. Likely `tun0`.
 3. Verify `Tools > Options > Downloads > Saving Management > Default Save Path` is set to `/downloads`, and incomplete torrents kept in `/downloads/incomplete`.
 4. Tweak the rest to your personal preference. Default works fine.
@@ -235,12 +238,12 @@ It automatically detects changes in these files. These files are added by other 
 1. Go to https://my-host.tail1c2ub3.ts.net/prowlarr.
 2. In `Settings > Download Clients` add qBittorrent and fill in the form.
 3. In `Settings > Indexers > Indexer Proxies` add FlareSolverr and fill in the form.
-4. In `Settings > Apps > Applications` add Lidarr, Radarr and Sonarr and fill in the form. 
+4. In `Settings > Apps > Applications` add Lidarr, Radarr and Sonarr and fill in the form.
    API keys are retrieved from the targeted applications web UI under `Settings > General > Security > API Key`.
 5. Add sources/indexer(s) to query in `Indexers > Add Indexer`.
 
 #### Sonarr, Radarr & Lidarr
-1. In `Settings > Media Management > Root Folders` add the corresponding root folder and fill in the form. If issues arise, check [debugging](#debugging), 
+1. In `Settings > Media Management > Root Folders` add the corresponding root folder and fill in the form. If issues arise, check [debugging](#debugging),
    e.g. [Folder '/tv/' is not writable by user 'abc'](#unable-to-add-root-folder---folder-tv-is-not-writable-by-user-abc).
 2. In `Settings > Download Clients` add qBittorrent and fill in the form.
 3. In `Settings > Media Management > Movie/Track/Episode Naming > Rename Movies/Tracks/Episodes` I recommend turning it on.
@@ -267,5 +270,3 @@ This is at best a workaround, however. A permanent solution would be a remake of
 ### Expose setup to the internet using tailscale funnel
 If you want to expose your setup to the internet (not recommended, but ultimately up to you if you accept and understand the associated risks), an option to those who've already used tailscale to serve the website is [tailscale funnel](https://tailscale.com/kb/1223/funnel).
 Not tried it myself, but should work wonders for this type of setup.
-
-
